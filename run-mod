@@ -1,0 +1,20 @@
+#!/bin/sh
+
+mod="$1"
+dat="$2"
+use="$0 <.mod> <.dat>"
+
+if test -z "$mod";then
+    echo $use >&2
+    exit 1
+fi
+
+if test -z "$dat";then
+    echo $use >&2
+    exit 1
+fi
+
+glpsol --math -m $mod -d $dat --check --wlp $mod.lp >/dev/null
+gurobi_cl ResultFile=$dat.sol $mod.lp 1>&2 
+rm $mod.lp
+exec less $dat.sol
