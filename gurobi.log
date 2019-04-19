@@ -11687,3 +11687,186 @@ Best objective 2.942489975514e+02, best bound 2.942489975514e+02, gap 0.0000%
 
 Wrote result file 'cordeau-2006-instances/a2-16.dat.sol'
 
+
+Gurobi 8.1.0 (linux64) logging started Fri Apr 19 23:39:44 2019
+
+Academic license - for non-commercial use only
+
+Gurobi Optimizer version 8.1.0 build v8.1.0rc1 (linux64)
+Copyright (c) 2018, Gurobi Optimization, LLC
+
+Read LP format model from file darp-1.mod.lp
+Reading time = 0.02 seconds
+cost: 2568 rows, 2381 columns, 19137 nonzeros
+Optimize a model with 2568 rows, 2381 columns and 19137 nonzeros
+Variable types: 69 continuous, 2312 integer (0 binary)
+Coefficient statistics:
+  Matrix range     [3e-01, 5e+02]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 1e+03]
+Presolve removed 1450 rows and 1165 columns
+Presolve time: 0.03s
+Presolved: 1118 rows, 1216 columns, 15977 nonzeros
+Variable types: 66 continuous, 1150 integer (1148 binary)
+
+Root relaxation: objective 2.201101e+02, 513 iterations, 0.01 seconds
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0  224.25013    0   90          -  224.25013      -     -    0s
+     0     0  235.67703    0   98          -  235.67703      -     -    0s
+     0     0  235.71573    0  101          -  235.71573      -     -    0s
+     0     0  235.71573    0  101          -  235.71573      -     -    0s
+     0     0  238.48145    0   79          -  238.48145      -     -    0s
+     0     0  240.21870    0  103          -  240.21870      -     -    0s
+     0     0  240.23351    0   96          -  240.23351      -     -    0s
+     0     0  240.41178    0   95          -  240.41178      -     -    0s
+     0     0  240.43257    0   95          -  240.43257      -     -    0s
+     0     0  241.90232    0  107          -  241.90232      -     -    0s
+     0     0  242.56347    0  114          -  242.56347      -     -    0s
+     0     0  242.60813    0  114          -  242.60813      -     -    0s
+     0     0  242.60813    0  110          -  242.60813      -     -    0s
+     0     0  250.18293    0  108          -  250.18293      -     -    0s
+     0     0  250.71825    0   76          -  250.71825      -     -    0s
+     0     0  250.73888    0   83          -  250.73888      -     -    0s
+     0     0  251.29525    0   84          -  251.29525      -     -    0s
+     0     0  251.30200    0   83          -  251.30200      -     -    0s
+     0     0  252.26341    0   98          -  252.26341      -     -    0s
+     0     0  252.31172    0   97          -  252.31172      -     -    0s
+     0     0  252.31172    0   97          -  252.31172      -     -    0s
+     0     0  253.51747    0  120          -  253.51747      -     -    0s
+     0     0  253.53106    0  117          -  253.53106      -     -    0s
+     0     0  253.53757    0  120          -  253.53757      -     -    0s
+     0     0  254.50955    0  124          -  254.50955      -     -    0s
+     0     0  256.69282    0  128          -  256.69282      -     -    0s
+     0     0  256.82557    0  133          -  256.82557      -     -    0s
+     0     0  256.83197    0  135          -  256.83197      -     -    0s
+H    0     0                     346.3220000  256.83197  25.8%     -    0s
+     0     0  258.04796    0  122  346.32200  258.04796  25.5%     -    0s
+     0     0  259.08950    0   95  346.32200  259.08950  25.2%     -    0s
+     0     0  259.09872    0  112  346.32200  259.09872  25.2%     -    0s
+H    0     0                     321.9410000  259.09872  19.5%     -    0s
+     0     0  260.35579    0  134  321.94100  260.35579  19.1%     -    0s
+     0     0  260.43885    0  114  321.94100  260.43885  19.1%     -    0s
+     0     0  260.43885    0  117  321.94100  260.43885  19.1%     -    0s
+     0     0  260.90295    0  121  321.94100  260.90295  19.0%     -    0s
+     0     0  260.90745    0  111  321.94100  260.90745  19.0%     -    0s
+H    0     0                     312.7190000  260.90745  16.6%     -    0s
+H    0     0                     303.9150000  260.90745  14.2%     -    0s
+     0     0  260.90745    0  113  303.91500  260.90745  14.2%     -    0s
+     0     0  260.90745    0  112  303.91500  260.90745  14.2%     -    0s
+     0     2  260.90745    0  110  303.91500  260.90745  14.2%     -    0s
+H   37    30                     298.2500000  270.63197  9.26%  27.2    0s
+H  113    70                     297.3030000  270.71202  8.94%  22.3    0s
+*  677   134              11     295.8340000  279.99362  5.35%  18.3    0s
+*  710    97              22     294.2490000  283.18599  3.76%  18.4    0s
+
+Cutting planes:
+  Learned: 2
+  Gomory: 4
+  Cover: 6
+  Implied bound: 27
+  Clique: 8
+  MIR: 60
+  StrongCG: 1
+  GUB cover: 3
+  Inf proof: 11
+  Zero half: 22
+
+Explored 910 nodes (17349 simplex iterations) in 1.01 seconds
+Thread count was 8 (of 8 available processors)
+
+Solution count 8: 294.249 295.834 297.303 ... 346.322
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 2.942490000000e+02, best bound 2.942490000000e+02, gap 0.0000%
+
+Wrote result file 'instances-cordeau/a2-16.dat.sol'
+
+
+Gurobi 8.1.0 (linux64) logging started Fri Apr 19 23:40:02 2019
+
+Academic license - for non-commercial use only
+
+Gurobi Optimizer version 8.1.0 build v8.1.0rc1 (linux64)
+Copyright (c) 2018, Gurobi Optimization, LLC
+
+Read LP format model from file darp-1.mod.lp
+Reading time = 0.01 seconds
+cost: 3844 rows, 3613 columns, 29353 nonzeros
+Optimize a model with 3844 rows, 3613 columns and 29353 nonzeros
+Variable types: 85 continuous, 3528 integer (0 binary)
+Coefficient statistics:
+  Matrix range     [3e-01, 6e+02]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 1e+03]
+Presolve removed 2418 rows and 1918 columns
+Presolve time: 0.06s
+Presolved: 1426 rows, 1695 columns, 10496 nonzeros
+Variable types: 75 continuous, 1620 integer (1619 binary)
+
+Root relaxation: objective 2.323087e+02, 586 iterations, 0.02 seconds
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0  232.30875    0  106          -  232.30875      -     -    0s
+     0     0  259.29588    0  115          -  259.29588      -     -    0s
+     0     0  261.04633    0  100          -  261.04633      -     -    0s
+     0     0  262.04583    0   83          -  262.04583      -     -    0s
+     0     0  262.04583    0   83          -  262.04583      -     -    0s
+     0     0  271.43696    0  106          -  271.43696      -     -    0s
+     0     0  272.42958    0  103          -  272.42958      -     -    0s
+     0     0  272.72135    0  131          -  272.72135      -     -    0s
+     0     0  272.82975    0  102          -  272.82975      -     -    0s
+H    0     0                     351.5830000  272.82975  22.4%     -    0s
+H    0     0                     349.3300000  272.82975  21.9%     -    0s
+     0     0  272.94162    0  133  349.33000  272.94162  21.9%     -    0s
+     0     0  272.97037    0  123  349.33000  272.97037  21.9%     -    0s
+     0     0  272.97037    0  123  349.33000  272.97037  21.9%     -    0s
+     0     0  277.56322    0  125  349.33000  277.56322  20.5%     -    0s
+H    0     0                     346.1360000  277.56322  19.8%     -    0s
+     0     0  277.98565    0  123  346.13600  277.98565  19.7%     -    0s
+     0     0  278.13238    0  128  346.13600  278.13238  19.6%     -    0s
+     0     0  278.13238    0  129  346.13600  278.13238  19.6%     -    0s
+     0     0  278.41370    0  123  346.13600  278.41370  19.6%     -    0s
+     0     0  278.63780    0  136  346.13600  278.63780  19.5%     -    0s
+     0     0  278.68494    0  129  346.13600  278.68494  19.5%     -    0s
+     0     0  278.69771    0  135  346.13600  278.69771  19.5%     -    0s
+     0     0  280.73142    0  138  346.13600  280.73142  18.9%     -    0s
+     0     0  280.73142    0  139  346.13600  280.73142  18.9%     -    0s
+     0     0  282.09330    0  151  346.13600  282.09330  18.5%     -    0s
+     0     0  282.16769    0  153  346.13600  282.16769  18.5%     -    0s
+     0     0  282.16769    0  155  346.13600  282.16769  18.5%     -    0s
+     0     0  282.49132    0  158  346.13600  282.49132  18.4%     -    0s
+     0     0  282.50500    0  159  346.13600  282.50500  18.4%     -    0s
+     0     0  282.50500    0  160  346.13600  282.50500  18.4%     -    0s
+     0     0  282.50500    0  158  346.13600  282.50500  18.4%     -    0s
+H    0     0                     344.8340000  282.50500  18.1%     -    0s
+     0     2  282.50500    0  158  344.83400  282.50500  18.1%     -    0s
+
+Cutting planes:
+  Learned: 5
+  Gomory: 7
+  Cover: 20
+  Implied bound: 84
+  Clique: 3
+  MIR: 67
+  GUB cover: 4
+  Inf proof: 6
+  Zero half: 29
+  Mod-K: 1
+
+Explored 4716 nodes (106503 simplex iterations) in 3.06 seconds
+Thread count was 8 (of 8 available processors)
+
+Solution count 4: 344.834 346.136 349.33 351.583 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 3.448340000000e+02, best bound 3.448340000000e+02, gap 0.0000%
+
+Wrote result file 'instances-cordeau/a2-20.dat.sol'
+
