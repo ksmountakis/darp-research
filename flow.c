@@ -19,16 +19,13 @@ typedef struct {
 
 typedef struct {
 	int (*prioritize)(const void*, const void*);
-	int *a, *o;
+	int *o;
 	float *s;
 	int *v;
-	float *tardiness, *best_objective_tardiness;
 	int *inserted;
-	int ***arc;
 	tuple_t *tuples;
 	chain_node_t **chain;
-	float objective, max_tard;
-} work_t;
+} aux_t;
 
 typedef struct {
 	int N, n, m;
@@ -60,55 +57,43 @@ int priority_criterion(const void *t1ptr, const void *t2ptr) {
 }
 
 static void
-work_create(work_t *work, darp_t darp)
+initialize(aux_t *aux, darp_t darp)
 {
-	int i, j, k;
+	int k;
 
-	work->prioritize = priority_criterion;
-
-	assert((work->tuples = calloc(sizeof(tuple_t), darp.N)));
-	assert((work->tardiness = calloc(sizeof(float), darp.N)));
-	assert((work->s = calloc(sizeof(float), darp.N)));
-	assert((work->v = calloc(sizeof(int), darp.n)));
-	assert((work->best_objective_tardiness = calloc(sizeof(float), darp.N)));
-	assert((work->inserted = calloc(sizeof(int), darp.N)));
-	assert((work->arc = calloc(sizeof(int*), darp.N)));
-	for (i=0; i < darp.N; i++) {
-		assert((work->arc[i] = calloc(sizeof(int*), darp.N)));
-		for (j=0; j < darp.N; j++)
-			assert((work->arc[i][j] = calloc(sizeof(int), darp.m)));
-	}
-	assert((work->a = calloc(sizeof(int), darp.N)));
-	assert((work->o = calloc(sizeof(int), darp.N)));
-	assert((work->chain = calloc(sizeof(chain_node_t*), darp.m)));
+	aux->prioritize = priority_criterion;
+	assert((aux->tuples = calloc(sizeof(tuple_t), darp.N)));
+	assert((aux->v = calloc(sizeof(int), darp.n)));
+	assert((aux->inserted = calloc(sizeof(int), darp.N)));
+	assert((aux->o = calloc(sizeof(int), darp.N)));
+	assert((aux->chain = calloc(sizeof(chain_node_t*), darp.m)));
 	for (k=0; k < darp.m; k++) 
-		assert((work->chain[k] = calloc(sizeof(chain_node_t), darp.N)));
-
+		assert((aux->chain[k] = calloc(sizeof(chain_node_t), darp.N)));
 }
 
 static void
-work_prioritize(work_t *work, darp_t darp)
+prioritize(aux_t *aux, const darp_t darp, float *tardvec, int *a)
 {
 	int i, z;
 	// sort according to priority criterion
 	for (i=0; i < darp.N; i++) {
-		work->tuples[i].i = i;
-		work->tuples[i].e = darp.e[i];
-		work->tuples[i].l = darp.l[i] - 0.5*work->tardiness[i]*rand()/RAND_MAX;
-		work->tuples[i].source = (i == 0);
-		work->tuples[i].sink = (i == darp.N-1);
+		aux->tuples[i].i = i;
+		aux->tuples[i].e = darp.e[i];
+		aux->tuples[i].l = darp.l[i] - 0.5*tardvec[i]*rand()/RAND_MAX;
+		aux->tuples[i].source = (i == 0);
+		aux->tuples[i].sink = (i == darp.N-1);
 	}
-	qsort(work->tuples, darp.N, sizeof(tuple_t), work->prioritize);
+	qsort(aux->tuples, darp.N, sizeof(tuple_t), aux->prioritize);
 
 	// initialize priority rule
 	for (z=0; z < darp.N; z++) {
-		work->a[z] = work->tuples[z].i;
-		work->o[work->tuples[z].i] = z;
+		a[z] = aux->tuples[z].i;
+		aux->o[aux->tuples[z].i] = z;
 	}
 }
 
 static void
-work_schedule(work_t *work, darp_t darp)
+rho(aux_t *aux, const darp_t darp, int *a, float *s, float ***arcmat, float *tardvec, float *tardmax, float *tardsum)
 {
 	int i, j, k, p, kmin, kmax;
 	int num_inserted;
@@ -117,40 +102,40 @@ work_schedule(work_t *work, darp_t darp)
 
 	// initialize chain-form schedule
 	for (k=0; k < darp.m; k++) {
-		work->chain[k][0].i = 0;
-		work->chain[k][0].leak = darp.Q;
+		aux->chain[k][0].i = 0;
+		aux->chain[k][0].leak = darp.Q;
 	}
 
 	// generate schedule
-	work->s[0] = 0;
+	s[0] = 0;
 	num_inserted = 0;
-	memset(work->inserted, 0, sizeof(int)*darp.N);
-	memset(work->tardiness, 0, sizeof(float)*darp.N);
+	memset(aux->inserted, 0, sizeof(int)*darp.N);
+	memset(tardvec, 0, sizeof(float)*darp.N);
 
-	work->objective = 0;
-	work->max_tard = 0;
+	*tardsum = 0;
+	*tardmax = 0;
 	while (num_inserted < darp.N-2)
 	{
 		// pick next eligible event from priority rule a[]
 		for (p=0; p < darp.N; p++) {
-			j = work->a[p];
+			j = a[p];
 
 			if (j == 0 || j == darp.N-1) 
 				continue;
 
 			//printf("\n%d ", j);
 
-			if (work->inserted[j]) {
+			if (aux->inserted[j]) {
 				//printf("already inserted");
 				continue;
 			}
 
 			if (j > darp.n && j < 2*darp.n+1) {
-				if (!work->inserted[j-darp.n]) {
+				if (!aux->inserted[j-darp.n]) {
 					//printf("pickup not yet inserted");
 					continue;
 				}
-				kmin = kmax = work->v[j-darp.n];
+				kmin = kmax = aux->v[j-darp.n];
 			} else {
 				kmin = 0;
 				kmax = darp.m-1;
@@ -160,13 +145,13 @@ work_schedule(work_t *work, darp_t darp)
 			best_found = best_k = 0;
 
 			for (k=kmin; k <= kmax; k++) {
-				if (work->chain[k][0].leak < darp.q[j]) 
+				if (aux->chain[k][0].leak < darp.q[j]) 
 					continue;
 
-				i = work->chain[k][0].i;
-				work->s[j] = work->s[i] + darp.t[i][j] + darp.d[i];
-				work->s[j] = fmax(darp.e[j], work->s[j]);
-				tard = work->s[j] - darp.l[j];
+				i = aux->chain[k][0].i;
+				s[j] = s[i] + darp.t[i][j] + darp.d[i];
+				s[j] = fmax(darp.e[j], s[j]);
+				tard = s[j] - darp.l[j];
 
 				if (tard <= best_tard) {
 					best_k = k;
@@ -176,16 +161,16 @@ work_schedule(work_t *work, darp_t darp)
 			}
 
 			if (best_found) {
-				work->objective += darp.t[work->chain[best_k][0].i][j];
-				work->max_tard = fmax(work->max_tard, best_tard);
+				*tardsum += darp.t[aux->chain[best_k][0].i][j];
+				*tardmax = fmax(*tardmax, best_tard);
 				//printf("(%d,%d):%d\n", chain[best_k][0].i, j, k);
-				work->arc[work->chain[best_k][0].i][j][best_k] = 1;
-				work->chain[best_k][0].i = j;
-				work->chain[best_k][0].leak -= darp.q[j];
-				work->inserted[j] = 1;
-				work->tardiness[j] = best_tard;
+				arcmat[aux->chain[best_k][0].i][j][best_k] = 1;
+				aux->chain[best_k][0].i = j;
+				aux->chain[best_k][0].leak -= darp.q[j];
+				aux->inserted[j] = 1;
+				tardvec[j] = best_tard;
 				if (j <= darp.n)
-					work->v[j] = best_k;
+					aux->v[j] = best_k;
 				num_inserted++;
 				//printf("inserted %d (k=%d leak=%d tard=%.1f)\n", j, best_k, chain[best_k][0].leak, best_tard);
 			} else {
@@ -196,11 +181,10 @@ work_schedule(work_t *work, darp_t darp)
 
 	// append sink to all machines
 	for (k=0; k < darp.m; k++) {
-		i = work->chain[k][0].i;
-		work->arc[i][darp.N-1][k] = 1;
-		work->s[darp.N-1] = fmax(work->s[darp.N-1], work->s[i] + darp.d[i] + darp.t[i][darp.N-1]);
+		i = aux->chain[k][0].i;
+		arcmat[i][darp.N-1][k] = 1;
+		s[darp.N-1] = fmax(s[darp.N-1], s[i] + darp.d[i] + darp.t[i][darp.N-1]);
 	}
-
 }
 
 static void
@@ -245,29 +229,39 @@ darp_create(darp_t *darp)
 int
 main(void)
 {
-	int restart, maxrestarts = 200;
-	float best_objective = RAND_MAX;
-	float *best_objective_tardiness;
+	int restart, maxrestarts = 100;
+	float cost_star = RAND_MAX;
+	float *tardvec_star;
+	float *s, *tardvec, tardmax, tardsum, ***arcmat;
+	int i, j, *priority_rule;
 
 	darp_t darp;
-	work_t work;
+	aux_t aux;
 
 	darp_create(&darp);
-	work_create(&work, darp);
+	initialize(&aux, darp);
 
-	assert((best_objective_tardiness = calloc(sizeof(float), darp.N)));
+	assert((s = calloc(sizeof(float), darp.N)));
+	assert((priority_rule = calloc(sizeof(int), darp.N)));
+	assert((tardvec = calloc(sizeof(float), darp.N)));
+	assert((tardvec_star = calloc(sizeof(float), darp.N)));
+	assert((arcmat = calloc(sizeof(int*), darp.N)));
+	for (i=0; i < darp.N; i++) {
+		assert((arcmat[i] = calloc(sizeof(int*), darp.N)));
+		for (j=0; j < darp.N; j++)
+			assert((arcmat[i][j] = calloc(sizeof(int), darp.m)));
+	}
 
 	for (restart=0; restart < maxrestarts; restart++) {
+		prioritize(&aux, darp, tardvec, priority_rule);
+		rho(&aux, darp, priority_rule, s, arcmat, tardvec, &tardmax, &tardsum);
 
-		work_prioritize(&work, darp);
-		work_schedule(&work, darp);
-
-		if (work.max_tard < best_objective) {
-			printf("objective %f max_tard %f\n", work.objective, work.max_tard);
-			best_objective = work.max_tard;
-			memcpy(best_objective_tardiness, work.tardiness, sizeof(float)*darp.N);
+		if (tardmax < cost_star) {
+			printf("cost %f tardmax %f\n", tardsum, tardmax);
+			cost_star = tardmax;
+			memcpy(tardvec_star, tardvec, sizeof(float)*darp.N);
 		} else {
-			memcpy(work.tardiness, best_objective_tardiness, sizeof(float)*darp.N);
+			memcpy(tardvec, tardvec_star, sizeof(float)*darp.N);
 		}
 	}
 

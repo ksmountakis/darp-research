@@ -15,7 +15,7 @@ param q {i in N} integer;
 param e {i in N} >= 0;
 param l {i in N} >= 0;
 param t {i in N, j in N} >= 0;
-param bigM integer := T;
+param bigM integer := 1e3*T;
 
 var x {i in N, j in N, k in K} binary;
 #var s {i in N, k in K} >= 0;

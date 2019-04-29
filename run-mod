@@ -15,6 +15,6 @@ if test -z "$dat";then
 fi
 
 glpsol --math -m $mod -d $dat --check --wlp $mod.lp >/dev/null
-gurobi_cl ResultFile=$dat.sol $mod.lp 1>&2 
+gurobi_cl ResultFile=$dat.sol IntFeasTol=1e-8 TimeLimit=120 $mod.lp 1>&2 
 rm $mod.lp
 exec less $dat.sol
