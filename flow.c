@@ -18,14 +18,14 @@ typedef struct {
 } chain_node_t;
 
 typedef struct {
-	int (*prioritize)(const void*, const void*);
+	int (*make_priority_rule)(const void*, const void*);
 	int *o;
 	float *s;
 	int *v;
 	int *inserted;
 	tuple_t *tuples;
 	chain_node_t **chain;
-} aux_t;
+} rho_ctx_t;
 
 typedef struct {
 	int N, n, m;
@@ -57,43 +57,43 @@ int priority_criterion(const void *t1ptr, const void *t2ptr) {
 }
 
 static void
-initialize(aux_t *aux, darp_t darp)
+rho_ctx_create(darp_t darp, rho_ctx_t *rho_ctx)
 {
 	int k;
 
-	aux->prioritize = priority_criterion;
-	assert((aux->tuples = calloc(sizeof(tuple_t), darp.N)));
-	assert((aux->v = calloc(sizeof(int), darp.n)));
-	assert((aux->inserted = calloc(sizeof(int), darp.N)));
-	assert((aux->o = calloc(sizeof(int), darp.N)));
-	assert((aux->chain = calloc(sizeof(chain_node_t*), darp.m)));
+	rho_ctx->make_priority_rule = priority_criterion;
+	assert((rho_ctx->tuples = calloc(sizeof(tuple_t), darp.N)));
+	assert((rho_ctx->v = calloc(sizeof(int), darp.n)));
+	assert((rho_ctx->inserted = calloc(sizeof(int), darp.N)));
+	assert((rho_ctx->o = calloc(sizeof(int), darp.N)));
+	assert((rho_ctx->chain = calloc(sizeof(chain_node_t*), darp.m)));
 	for (k=0; k < darp.m; k++) 
-		assert((aux->chain[k] = calloc(sizeof(chain_node_t), darp.N)));
+		assert((rho_ctx->chain[k] = calloc(sizeof(chain_node_t), darp.N)));
 }
 
 static void
-prioritize(aux_t *aux, const darp_t darp, float *tardvec, int *a)
+make_priority_rule(rho_ctx_t *rho_ctx, const darp_t darp, float *tardvec, int *a)
 {
 	int i, z;
 	// sort according to priority criterion
 	for (i=0; i < darp.N; i++) {
-		aux->tuples[i].i = i;
-		aux->tuples[i].e = darp.e[i];
-		aux->tuples[i].l = darp.l[i] - 0.5*tardvec[i]*rand()/RAND_MAX;
-		aux->tuples[i].source = (i == 0);
-		aux->tuples[i].sink = (i == darp.N-1);
+		rho_ctx->tuples[i].i = i;
+		rho_ctx->tuples[i].e = darp.e[i];
+		rho_ctx->tuples[i].l = darp.l[i] - 0.5*tardvec[i]*rand()/RAND_MAX;
+		rho_ctx->tuples[i].source = (i == 0);
+		rho_ctx->tuples[i].sink = (i == darp.N-1);
 	}
-	qsort(aux->tuples, darp.N, sizeof(tuple_t), aux->prioritize);
+	qsort(rho_ctx->tuples, darp.N, sizeof(tuple_t), rho_ctx->make_priority_rule);
 
 	// initialize priority rule
 	for (z=0; z < darp.N; z++) {
-		a[z] = aux->tuples[z].i;
-		aux->o[aux->tuples[z].i] = z;
+		a[z] = rho_ctx->tuples[z].i;
+		rho_ctx->o[rho_ctx->tuples[z].i] = z;
 	}
 }
 
 static void
-rho(aux_t *aux, const darp_t darp, int *a, float *s, float ***arcmat, float *tardvec, float *tardmax, float *tardsum)
+rho(rho_ctx_t *rho_ctx, const darp_t darp, int *a, float *s, float ***arcmat, float *tardvec, float *tardmax, float *tardsum)
 {
 	int i, j, k, p, kmin, kmax;
 	int num_inserted;
@@ -102,14 +102,14 @@ rho(aux_t *aux, const darp_t darp, int *a, float *s, float ***arcmat, float *tar
 
 	// initialize chain-form schedule
 	for (k=0; k < darp.m; k++) {
-		aux->chain[k][0].i = 0;
-		aux->chain[k][0].leak = darp.Q;
+		rho_ctx->chain[k][0].i = 0;
+		rho_ctx->chain[k][0].leak = darp.Q;
 	}
 
 	// generate schedule
 	s[0] = 0;
 	num_inserted = 0;
-	memset(aux->inserted, 0, sizeof(int)*darp.N);
+	memset(rho_ctx->inserted, 0, sizeof(int)*darp.N);
 	memset(tardvec, 0, sizeof(float)*darp.N);
 
 	*tardsum = 0;
@@ -125,17 +125,17 @@ rho(aux_t *aux, const darp_t darp, int *a, float *s, float ***arcmat, float *tar
 
 			//printf("\n%d ", j);
 
-			if (aux->inserted[j]) {
+			if (rho_ctx->inserted[j]) {
 				//printf("already inserted");
 				continue;
 			}
 
 			if (j > darp.n && j < 2*darp.n+1) {
-				if (!aux->inserted[j-darp.n]) {
+				if (!rho_ctx->inserted[j-darp.n]) {
 					//printf("pickup not yet inserted");
 					continue;
 				}
-				kmin = kmax = aux->v[j-darp.n];
+				kmin = kmax = rho_ctx->v[j-darp.n];
 			} else {
 				kmin = 0;
 				kmax = darp.m-1;
@@ -145,10 +145,10 @@ rho(aux_t *aux, const darp_t darp, int *a, float *s, float ***arcmat, float *tar
 			best_found = best_k = 0;
 
 			for (k=kmin; k <= kmax; k++) {
-				if (aux->chain[k][0].leak < darp.q[j]) 
+				if (rho_ctx->chain[k][0].leak < darp.q[j]) 
 					continue;
 
-				i = aux->chain[k][0].i;
+				i = rho_ctx->chain[k][0].i;
 				s[j] = s[i] + darp.t[i][j] + darp.d[i];
 				s[j] = fmax(darp.e[j], s[j]);
 				tard = s[j] - darp.l[j];
@@ -161,16 +161,16 @@ rho(aux_t *aux, const darp_t darp, int *a, float *s, float ***arcmat, float *tar
 			}
 
 			if (best_found) {
-				*tardsum += darp.t[aux->chain[best_k][0].i][j];
+				*tardsum += darp.t[rho_ctx->chain[best_k][0].i][j];
 				*tardmax = fmax(*tardmax, best_tard);
 				//printf("(%d,%d):%d\n", chain[best_k][0].i, j, k);
-				arcmat[aux->chain[best_k][0].i][j][best_k] = 1;
-				aux->chain[best_k][0].i = j;
-				aux->chain[best_k][0].leak -= darp.q[j];
-				aux->inserted[j] = 1;
+				arcmat[rho_ctx->chain[best_k][0].i][j][best_k] = 1;
+				rho_ctx->chain[best_k][0].i = j;
+				rho_ctx->chain[best_k][0].leak -= darp.q[j];
+				rho_ctx->inserted[j] = 1;
 				tardvec[j] = best_tard;
 				if (j <= darp.n)
-					aux->v[j] = best_k;
+					rho_ctx->v[j] = best_k;
 				num_inserted++;
 				//printf("inserted %d (k=%d leak=%d tard=%.1f)\n", j, best_k, chain[best_k][0].leak, best_tard);
 			} else {
@@ -181,7 +181,7 @@ rho(aux_t *aux, const darp_t darp, int *a, float *s, float ***arcmat, float *tar
 
 	// append sink to all machines
 	for (k=0; k < darp.m; k++) {
-		i = aux->chain[k][0].i;
+		i = rho_ctx->chain[k][0].i;
 		arcmat[i][darp.N-1][k] = 1;
 		s[darp.N-1] = fmax(s[darp.N-1], s[i] + darp.d[i] + darp.t[i][darp.N-1]);
 	}
@@ -223,6 +223,9 @@ darp_create(darp_t *darp)
 		for (j=0; j <= i; j++)
 			darp->t[i][j] = sqrt(pow(darp->x[j]-darp->x[i],2) + pow(darp->y[j]-darp->y[i],2));
 	}
+
+	for (i=1; i < darp->n; i++) 
+		darp->l[i] = fmin(darp->l[i], darp->l[i+darp->n]-darp->t[i][i+darp->n]);
 }
 
 
@@ -236,10 +239,10 @@ main(void)
 	int i, j, *priority_rule;
 
 	darp_t darp;
-	aux_t aux;
+	rho_ctx_t rho_ctx;
 
 	darp_create(&darp);
-	initialize(&aux, darp);
+	rho_ctx_create(darp, &rho_ctx);
 
 	assert((s = calloc(sizeof(float), darp.N)));
 	assert((priority_rule = calloc(sizeof(int), darp.N)));
@@ -253,8 +256,8 @@ main(void)
 	}
 
 	for (restart=0; restart < maxrestarts; restart++) {
-		prioritize(&aux, darp, tardvec, priority_rule);
-		rho(&aux, darp, priority_rule, s, arcmat, tardvec, &tardmax, &tardsum);
+		make_priority_rule(&rho_ctx, darp, tardvec, priority_rule);
+		rho(&rho_ctx, darp, priority_rule, s, arcmat, tardvec, &tardmax, &tardsum);
 
 		if (tardmax < cost_star) {
 			printf("cost %f tardmax %f\n", tardsum, tardmax);
