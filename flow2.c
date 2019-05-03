@@ -24,11 +24,18 @@ typedef struct {
 #endif
 
 typedef struct {
+	int i;
+	int leak;
+	float s;
+} ChainNode;
+
+typedef struct {
 	int N, n, m;
 	float T, Q, L;
 	int i, j, k, z;
 	float *x, *y, *d, *q, *e, *l;
 	float **t;
+	ChainNode **chain;
 } Darp;
 
 typedef struct {
@@ -86,6 +93,15 @@ darpread(Darp *darp)
 	// tighten windows
 	for (i=1; i < darp->n; i++) 
 		darp->l[i] = fmin(darp->l[i], darp->l[i+darp->n]-darp->t[i][i+darp->n]);
+
+	// allocate chains
+	int k;
+	assert((darp->chain = calloc(sizeof(ChainNode*),darp->m)));
+	for (k=0; k < darp->m; k++) {
+		assert((darp->chain[k] = calloc(sizeof(ChainNode),darp->N)));
+		darp->chain[k][0].i = 0;
+		darp->chain[k][0].leak = darp->Q;
+	}
 }
 
 static int 
@@ -269,12 +285,160 @@ darpreset(Darp *darp, Schedule *s)
 	s->a[s->a[0].i].source = 1;
 }
 
+static float
+darprho(Darp *darp, ChainNode **chain, RuleItem *a, int N, float *tardvec)
+{
+	// generate schedule
+	a[0].s = 0;
+
+	static int *inserted, *vehicle;
+	assert((inserted = realloc(inserted, sizeof(int)*darp->N)));
+	assert((vehicle = realloc(vehicle, sizeof(int)*darp->N)));
+	memset(inserted, 0, sizeof(int)*darp->N);
+	memset(vehicle, 0, sizeof(int)*darp->N);
+
+	memset(tardvec, 0, sizeof(float)*darp->N);
+	int num_inserted = 0;
+	float tardmax = 0;
+	while (num_inserted < darp->N-2)
+	{
+		int p;
+		// pick next eligible event from priority rule a[]
+		for (p=1; p < N; p++) 
+		{
+			if (inserted[a[p].i])
+				continue;
+
+			// determine range of vehicles to try
+			int k, kmin, kmax;
+			if (a[p].i > darp->n && a[p].i < 2*darp->n+1) {
+				if (!inserted[a[p].i-darp->n]) {
+					//printf("pickup not yet inserted");
+					continue;
+				}
+				kmin = kmax = vehicle[a[p].i-darp->n];
+			} else {
+				kmin = 0;
+				kmax = darp->m-1;
+			}
+
+			// try each vehicle
+			float best_tard = 10*darp->T;
+			int best_found = 0, best_k = 0;
+
+			for (k=kmin; k <= kmax; k++) 
+			{
+				if (chain[k][0].leak < darp->q[a[p].i]) 
+					continue;
+#if 1
+				a[p].s = chain[k][0].s + darp->t[chain[k][0].i][a[p].i] + darp->d[a[p].i];
+				a[p].s = fmax(darp->e[a[p].i], a[p].s);
+				tard = a[p].s - darp->l[a[p].i];
+
+				if (tard <= best_tard) {
+					best_k = k;
+					best_tard = tard;
+					best_found = 1;
+				}
+#endif
+			}
+		}
+		num_inserted++;
+	}
+
+#if 0
+	int i, j, k, p, kmin, kmax;
+	int num_inserted;
+	float tard, best_tard;
+	int best_k, best_found;
+
+	*tardsum = 0;
+	*tardmax = 0;
+	while (num_inserted < darp.N-2)
+	{
+		// pick next eligible event from priority rule a[]
+		for (p=0; p < darp.N; p++) {
+			j = a[p];
+
+			if (j == 0 || j == darp.N-1) 
+				continue;
+
+			//printf("\n%d ", j);
+
+			if (rho_ctx->inserted[j]) {
+				//printf("already inserted");
+				continue;
+			}
+
+			if (j > darp.n && j < 2*darp.n+1) {
+				if (!rho_ctx->inserted[j-darp.n]) {
+					//printf("pickup not yet inserted");
+					continue;
+				}
+				kmin = kmax = rho_ctx->v[j-darp.n];
+			} else {
+				kmin = 0;
+				kmax = darp.m-1;
+			}
+
+			best_tard = 10*darp.T;
+			best_found = best_k = 0;
+
+			for (k=kmin; k <= kmax; k++) {
+				if (rho_ctx->chain[k][0].leak < darp.q[j]) 
+					continue;
+
+				i = rho_ctx->chain[k][0].i;
+				s[j] = s[i] + darp.t[i][j] + darp.d[i];
+				s[j] = fmax(darp.e[j], s[j]);
+				tard = s[j] - darp.l[j];
+
+				if (tard <= best_tard) {
+					best_k = k;
+					best_tard = tard;
+					best_found = 1;
+				}
+			}
+
+			if (best_found) {
+				*tardsum += darp.t[rho_ctx->chain[best_k][0].i][j];
+				*tardmax = fmax(*tardmax, best_tard);
+				//printf("(%d,%d):%d\n", chain[best_k][0].i, j, k);
+				arcmat[rho_ctx->chain[best_k][0].i][j][best_k] = 1;
+				rho_ctx->chain[best_k][0].i = j;
+				rho_ctx->chain[best_k][0].leak -= darp.q[j];
+				rho_ctx->inserted[j] = 1;
+				tardvec[j] = best_tard;
+				if (j <= darp.n)
+					rho_ctx->v[j] = best_k;
+				num_inserted++;
+				//printf("inserted %d (k=%d leak=%d tard=%.1f)\n", j, best_k, chain[best_k][0].leak, best_tard);
+			} else {
+				//printf("no sufficient leak");
+			}
+		}
+	}
+
+	// append sink to all machines
+	for (k=0; k < darp.m; k++) {
+		i = rho_ctx->chain[k][0].i;
+		arcmat[i][darp.N-1][k] = 1;
+		s[darp.N-1] = fmax(s[darp.N-1], s[i] + darp.d[i] + darp.t[i][darp.N-1]);
+	}
+#endif
+
+	return 0;
+}
 
 static void
 darpinsert(Darp *darp, Schedule *s, int j)
 {
 	int lmin, l, y, i, accept;
 	RuleItem a[darp->N];
+	static float *tardvec;
+	float tardmax;
+
+	assert((tardvec = realloc(tardvec, sizeof(float)*darp->N)));
 
 	// compute s->a[] by sorting in ascending start-time
 	qsort(s->a, s->n, sizeof(RuleItem), darprulecmp);
@@ -294,14 +458,14 @@ darpinsert(Darp *darp, Schedule *s, int j)
 			exit(1);
 		}
 	}
+	if (j == darp->N-1)
+		lmin = s->n;
 
 	printf("inserting %c %2d: ", PDchar(darp,j), j);
 	for (l=0; l < s->n; l++)
 		printf("%2d ", s->a[l].i);
 	printf(" lmin=%2d\n", lmin);
 
-	if (j == darp->N-1)
-		lmin = s->n;
 
 	memset(a, 0, sizeof(RuleItem)*darp->N);
 	for (l=lmin; l <= s->n; l++) {
@@ -320,10 +484,11 @@ darpinsert(Darp *darp, Schedule *s, int j)
 		// create s[] based on a[]
 		// TODO
 		a[l].s = (float)j;
-		
+		tardmax = darprho(darp, darp->chain, a, s->n+1, tardvec);
+
 		// examine schedule
 		accept = 0;
-		if (l == s->n)
+		if (tardmax <= 5.0 || l == s->n)
 			accept = 1;
 
 		printf("a: ");
@@ -351,6 +516,7 @@ main(void)
 
 	// read problem
 	darpread(&darp);
+
 
 	// perform main iterations
 	for (loop=0; loop < maxloop; loop++) {
