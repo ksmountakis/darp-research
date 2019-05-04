@@ -4,25 +4,6 @@
 #include <assert.h>
 #include <string.h>
 
-#if 0
-
-typedef struct {
-	int i;
-	int leak;
-	float s;
-} chain_node_t;
-
-typedef struct {
-	int (*make_priority_rule)(const void*, const void*);
-	int *o;
-	float *s;
-	int *v;
-	int *inserted;
-	tuple_t *tuples;
-	chain_node_t **chain;
-} rho_ctx_t;
-#endif
-
 typedef struct {
 	int i;
 	int leak;
@@ -159,119 +140,6 @@ darpmkrule(Darp *darp, RuleItem **rule)
 	return order;
 }
 
-
-#if 0
-static void
-rho_ctx_create(darp_t darp, rho_ctx_t *rho_ctx)
-{
-	int k;
-
-	rho_ctx->make_priority_rule = priority_criterion;
-	assert((rho_ctx->tuples = calloc(sizeof(tuple_t), darp.N)));
-	assert((rho_ctx->v = calloc(sizeof(int), darp.n)));
-	assert((rho_ctx->inserted = calloc(sizeof(int), darp.N)));
-	assert((rho_ctx->o = calloc(sizeof(int), darp.N)));
-	assert((rho_ctx->chain = calloc(sizeof(chain_node_t*), darp.m)));
-	for (k=0; k < darp.m; k++) 
-		assert((rho_ctx->chain[k] = calloc(sizeof(chain_node_t), darp.N)));
-}
-
-static void
-rho(rho_ctx_t *rho_ctx, const darp_t darp, int *a, float *s, float ***arcmat, float *tardvec, float *tardmax, float *tardsum)
-{
-	int i, j, k, p, kmin, kmax;
-	int num_inserted;
-	float tard, best_tard;
-	int best_k, best_found;
-
-	// initialize chain-form schedule
-	for (k=0; k < darp.m; k++) {
-		rho_ctx->chain[k][0].i = 0;
-		rho_ctx->chain[k][0].leak = darp.Q;
-	}
-
-	// generate schedule
-	s[0] = 0;
-	num_inserted = 0;
-	memset(rho_ctx->inserted, 0, sizeof(int)*darp.N);
-	memset(tardvec, 0, sizeof(float)*darp.N);
-
-	*tardsum = 0;
-	*tardmax = 0;
-	while (num_inserted < darp.N-2)
-	{
-		// pick next eligible event from priority rule a[]
-		for (p=0; p < darp.N; p++) {
-			j = a[p];
-
-			if (j == 0 || j == darp.N-1) 
-				continue;
-
-			//printf("\n%d ", j);
-
-			if (rho_ctx->inserted[j]) {
-				//printf("already inserted");
-				continue;
-			}
-
-			if (j > darp.n && j < 2*darp.n+1) {
-				if (!rho_ctx->inserted[j-darp.n]) {
-					//printf("pickup not yet inserted");
-					continue;
-				}
-				kmin = kmax = rho_ctx->v[j-darp.n];
-			} else {
-				kmin = 0;
-				kmax = darp.m-1;
-			}
-
-			best_tard = 10*darp.T;
-			best_found = best_k = 0;
-
-			for (k=kmin; k <= kmax; k++) {
-				if (rho_ctx->chain[k][0].leak < darp.q[j]) 
-					continue;
-
-				i = rho_ctx->chain[k][0].i;
-				s[j] = s[i] + darp.t[i][j] + darp.d[i];
-				s[j] = fmax(darp.e[j], s[j]);
-				tard = s[j] - darp.l[j];
-
-				if (tard <= best_tard) {
-					best_k = k;
-					best_tard = tard;
-					best_found = 1;
-				}
-			}
-
-			if (best_found) {
-				*tardsum += darp.t[rho_ctx->chain[best_k][0].i][j];
-				*tardmax = fmax(*tardmax, best_tard);
-				//printf("(%d,%d):%d\n", chain[best_k][0].i, j, k);
-				arcmat[rho_ctx->chain[best_k][0].i][j][best_k] = 1;
-				rho_ctx->chain[best_k][0].i = j;
-				rho_ctx->chain[best_k][0].leak -= darp.q[j];
-				rho_ctx->inserted[j] = 1;
-				tardvec[j] = best_tard;
-				if (j <= darp.n)
-					rho_ctx->v[j] = best_k;
-				num_inserted++;
-				//printf("inserted %d (k=%d leak=%d tard=%.1f)\n", j, best_k, chain[best_k][0].leak, best_tard);
-			} else {
-				//printf("no sufficient leak");
-			}
-		}
-	}
-
-	// append sink to all machines
-	for (k=0; k < darp.m; k++) {
-		i = rho_ctx->chain[k][0].i;
-		arcmat[i][darp.N-1][k] = 1;
-		s[darp.N-1] = fmax(s[darp.N-1], s[i] + darp.d[i] + darp.t[i][darp.N-1]);
-	}
-}
-#endif
-
 #define PDchar(darp, j) ((inD(darp,j))? 'D': 'P')
 
 static void
@@ -288,29 +156,39 @@ darpreset(Darp *darp, Schedule *s)
 static float
 darprho(Darp *darp, ChainNode **chain, RuleItem *a, int N, float *tardvec)
 {
-	// generate schedule
+	int k;
+	// initialize schedule
 	a[0].s = 0;
+	for (k=0; k < darp->m; k++) {
+		chain[k][0].i = a[0].i;
+		chain[k][0].s = a[0].s;
+		chain[k][0].leak = darp->Q;
+	}
+
+	memset(tardvec, 0, sizeof(float)*darp->N);
+	float tardmax = 0;
+	float cost = 0;
 
 	static int *inserted, *vehicle;
 	assert((inserted = realloc(inserted, sizeof(int)*darp->N)));
-	assert((vehicle = realloc(vehicle, sizeof(int)*darp->N)));
 	memset(inserted, 0, sizeof(int)*darp->N);
+	inserted[0] = 1;
+	int num_inserted = 1;
+
+	assert((vehicle = realloc(vehicle, sizeof(int)*darp->N)));
 	memset(vehicle, 0, sizeof(int)*darp->N);
 
-	memset(tardvec, 0, sizeof(float)*darp->N);
-	int num_inserted = 0;
-	float tardmax = 0;
-	while (num_inserted < darp->N-2)
+	while (num_inserted < N)
 	{
 		int p;
 		// pick next eligible event from priority rule a[]
-		for (p=1; p < N; p++) 
+		for (p=0; p < N; p++) 
 		{
 			if (inserted[a[p].i])
 				continue;
 
 			// determine range of vehicles to try
-			int k, kmin, kmax;
+			int kmin, kmax;
 			if (a[p].i > darp->n && a[p].i < 2*darp->n+1) {
 				if (!inserted[a[p].i-darp->n]) {
 					//printf("pickup not yet inserted");
@@ -323,102 +201,48 @@ darprho(Darp *darp, ChainNode **chain, RuleItem *a, int N, float *tardvec)
 			}
 
 			// try each vehicle
-			float best_tard = 10*darp->T;
 			int best_found = 0, best_k = 0;
+			float best_tard = 1e9, best_s;
 
 			for (k=kmin; k <= kmax; k++) 
 			{
+				float tard;
 				if (chain[k][0].leak < darp->q[a[p].i]) 
 					continue;
-#if 1
-				a[p].s = chain[k][0].s + darp->t[chain[k][0].i][a[p].i] + darp->d[a[p].i];
-				a[p].s = fmax(darp->e[a[p].i], a[p].s);
+
+				a[p].s = fmax(darp->e[a[p].i], chain[k][0].s + darp->t[chain[k][0].i][a[p].i] + darp->d[a[p].i]);
 				tard = a[p].s - darp->l[a[p].i];
 
-				if (tard <= best_tard) {
+				if (tard < best_tard) {
 					best_k = k;
 					best_tard = tard;
 					best_found = 1;
+					best_s = a[p].s;
 				}
-#endif
+			}
+
+			// finalize best position found
+			if (best_found) {
+				a[p].s = best_s;
+				tardmax = fmax(tardmax, best_tard);
+				tardvec[a[p].i] = best_tard;
+				cost += darp->t[chain[best_k][0].i][a[p].i];
+				//arcmat[rho_ctx->chain[best_k][0].i][j][best_k] = 1;
+				printf("+ (%2d -> %2d) k %d s %.1f e %.1f leak %.1f\n", chain[best_k][0].i, a[p].i, best_k, a[p].s, darp->e[a[p].i], chain[best_k][0].leak - darp->q[a[p].i]);
+				chain[best_k][0].i = a[p].i;
+				chain[best_k][0].leak -= darp->q[a[p].i];
+				chain[best_k][0].s = a[p].s;
+				inserted[a[p].i] = 1;
+				if (a[p].i <= darp->n)
+					vehicle[a[p].i] = best_k;
+				num_inserted++;
+			} else {
+				printf("position not found for: %2d\n", a[p].i);
 			}
 		}
-		num_inserted++;
 	}
 
 #if 0
-	int i, j, k, p, kmin, kmax;
-	int num_inserted;
-	float tard, best_tard;
-	int best_k, best_found;
-
-	*tardsum = 0;
-	*tardmax = 0;
-	while (num_inserted < darp.N-2)
-	{
-		// pick next eligible event from priority rule a[]
-		for (p=0; p < darp.N; p++) {
-			j = a[p];
-
-			if (j == 0 || j == darp.N-1) 
-				continue;
-
-			//printf("\n%d ", j);
-
-			if (rho_ctx->inserted[j]) {
-				//printf("already inserted");
-				continue;
-			}
-
-			if (j > darp.n && j < 2*darp.n+1) {
-				if (!rho_ctx->inserted[j-darp.n]) {
-					//printf("pickup not yet inserted");
-					continue;
-				}
-				kmin = kmax = rho_ctx->v[j-darp.n];
-			} else {
-				kmin = 0;
-				kmax = darp.m-1;
-			}
-
-			best_tard = 10*darp.T;
-			best_found = best_k = 0;
-
-			for (k=kmin; k <= kmax; k++) {
-				if (rho_ctx->chain[k][0].leak < darp.q[j]) 
-					continue;
-
-				i = rho_ctx->chain[k][0].i;
-				s[j] = s[i] + darp.t[i][j] + darp.d[i];
-				s[j] = fmax(darp.e[j], s[j]);
-				tard = s[j] - darp.l[j];
-
-				if (tard <= best_tard) {
-					best_k = k;
-					best_tard = tard;
-					best_found = 1;
-				}
-			}
-
-			if (best_found) {
-				*tardsum += darp.t[rho_ctx->chain[best_k][0].i][j];
-				*tardmax = fmax(*tardmax, best_tard);
-				//printf("(%d,%d):%d\n", chain[best_k][0].i, j, k);
-				arcmat[rho_ctx->chain[best_k][0].i][j][best_k] = 1;
-				rho_ctx->chain[best_k][0].i = j;
-				rho_ctx->chain[best_k][0].leak -= darp.q[j];
-				rho_ctx->inserted[j] = 1;
-				tardvec[j] = best_tard;
-				if (j <= darp.n)
-					rho_ctx->v[j] = best_k;
-				num_inserted++;
-				//printf("inserted %d (k=%d leak=%d tard=%.1f)\n", j, best_k, chain[best_k][0].leak, best_tard);
-			} else {
-				//printf("no sufficient leak");
-			}
-		}
-	}
-
 	// append sink to all machines
 	for (k=0; k < darp.m; k++) {
 		i = rho_ctx->chain[k][0].i;
