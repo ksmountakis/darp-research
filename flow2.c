@@ -4,6 +4,25 @@
 #include <assert.h>
 #include <string.h>
 
+#if 0
+
+typedef struct {
+	int i;
+	int leak;
+	float s;
+} chain_node_t;
+
+typedef struct {
+	int (*make_priority_rule)(const void*, const void*);
+	int *o;
+	float *s;
+	int *v;
+	int *inserted;
+	tuple_t *tuples;
+	chain_node_t **chain;
+} rho_ctx_t;
+#endif
+
 typedef struct {
 	int i;
 	int leak;
@@ -30,6 +49,11 @@ typedef struct {
 	int n;
 	RuleItem *a;
 } Schedule;
+
+static int
+inD(Darp *darp, int i) {
+	return (i > darp->n);
+}
 
 static void
 darpread(Darp *darp)
@@ -72,8 +96,11 @@ darpread(Darp *darp)
 			darp->t[i][j] = sqrtf(powf(darp->x[j]-darp->x[i],2) + powf(darp->y[j]-darp->y[i],2));
 
 	// tighten windows
-	for (i=1; i < darp->n; i++) 
+	for (i=1; i < darp->n; i++) {
 		darp->l[i] = fmin(darp->l[i], darp->l[i+darp->n]-darp->t[i][i+darp->n]);
+		if (inD(darp, i))
+			darp->e[i]=0;
+	}
 
 	// allocate chains
 	int k;
@@ -106,10 +133,6 @@ darprulecmp(const void *t1ptr, const void *t2ptr) {
 	return +1;
 }
 
-static int
-inD(Darp *darp, int i) {
-	return (i > darp->n);
-}
 
 static int*
 darpmkrule(Darp *darp, RuleItem **rule)
@@ -140,6 +163,7 @@ darpmkrule(Darp *darp, RuleItem **rule)
 	return order;
 }
 
+
 #define PDchar(darp, j) ((inD(darp,j))? 'D': 'P')
 
 static void
@@ -154,7 +178,7 @@ darpreset(Darp *darp, Schedule *s)
 }
 
 static float
-darprho(Darp *darp, ChainNode **chain, RuleItem *a, int N, float *tardvec)
+darprho(Darp *darp, ChainNode **chain, RuleItem *a, int N, float *tardvec, float *tardmaxptr)
 {
 	int k;
 	// initialize schedule
@@ -169,12 +193,15 @@ darprho(Darp *darp, ChainNode **chain, RuleItem *a, int N, float *tardvec)
 	float tardmax = 0;
 	float cost = 0;
 
-	static int *inserted, *vehicle;
+	// mapping from node to {0,1}
+	static int *inserted;
 	assert((inserted = realloc(inserted, sizeof(int)*darp->N)));
 	memset(inserted, 0, sizeof(int)*darp->N);
 	inserted[0] = 1;
 	int num_inserted = 1;
 
+	// mapping from node to {0,...,m-1}
+	static int *vehicle;
 	assert((vehicle = realloc(vehicle, sizeof(int)*darp->N)));
 	memset(vehicle, 0, sizeof(int)*darp->N);
 
@@ -228,7 +255,7 @@ darprho(Darp *darp, ChainNode **chain, RuleItem *a, int N, float *tardvec)
 				tardvec[a[p].i] = best_tard;
 				cost += darp->t[chain[best_k][0].i][a[p].i];
 				//arcmat[rho_ctx->chain[best_k][0].i][j][best_k] = 1;
-				printf("+ (%2d -> %2d) k %d s %.1f e %.1f leak %.1f\n", chain[best_k][0].i, a[p].i, best_k, a[p].s, darp->e[a[p].i], chain[best_k][0].leak - darp->q[a[p].i]);
+				//printf("+ (%2d -> %2d) k %d s %.1f e %.1f leak %.1f\n", chain[best_k][0].i, a[p].i, best_k, a[p].s, darp->e[a[p].i], chain[best_k][0].leak - darp->q[a[p].i]);
 				chain[best_k][0].i = a[p].i;
 				chain[best_k][0].leak -= darp->q[a[p].i];
 				chain[best_k][0].s = a[p].s;
@@ -237,30 +264,23 @@ darprho(Darp *darp, ChainNode **chain, RuleItem *a, int N, float *tardvec)
 					vehicle[a[p].i] = best_k;
 				num_inserted++;
 			} else {
-				printf("position not found for: %2d\n", a[p].i);
+				//printf("position not found for: %2d\n", a[p].i);
 			}
 		}
 	}
 
-#if 0
-	// append sink to all machines
-	for (k=0; k < darp.m; k++) {
-		i = rho_ctx->chain[k][0].i;
-		arcmat[i][darp.N-1][k] = 1;
-		s[darp.N-1] = fmax(s[darp.N-1], s[i] + darp.d[i] + darp.t[i][darp.N-1]);
-	}
-#endif
+	*tardmaxptr = tardmax;
 
-	return 0;
+	return cost;
 }
 
-static void
+static float
 darpinsert(Darp *darp, Schedule *s, int j)
 {
 	int lmin, l, y, i, accept;
 	RuleItem a[darp->N];
 	static float *tardvec;
-	float tardmax;
+	float tardmax, cost;
 
 	assert((tardvec = realloc(tardvec, sizeof(float)*darp->N)));
 
@@ -286,7 +306,8 @@ darpinsert(Darp *darp, Schedule *s, int j)
 		lmin = s->n;
 
 	printf("inserting %c %2d: ", PDchar(darp,j), j);
-	for (l=0; l < s->n; l++)
+	// print current schedule
+	for (l=0; l < s->n; l++) 
 		printf("%2d ", s->a[l].i);
 	printf(" lmin=%2d\n", lmin);
 
@@ -306,28 +327,48 @@ darpinsert(Darp *darp, Schedule *s, int j)
 			a[y+1] = s->a[y];
 
 		// create s[] based on a[]
-		// TODO
-		a[l].s = (float)j;
-		tardmax = darprho(darp, darp->chain, a, s->n+1, tardvec);
+		cost = darprho(darp, darp->chain, a, s->n+1, tardvec, &tardmax);
 
 		// examine schedule
 		accept = 0;
-		if (tardmax <= 5.0 || l == s->n)
+		if (tardmax <= 0.0 || l == s->n)
 			accept = 1;
 
 		printf("a: ");
-		for (i=0; i <= s->n; i++)
+		for (i=0; i <= s->n; i++) {
+			float dt = a[i].s - darp->l[a[i].i];
 			printf("%2d ", a[i].i);
-		printf("\n");
+			if (dt > 0)
+				printf("[%2.1f] ", dt);
+			else
+				printf(" ");
+		}
+		printf(" := %.1f\n", cost);
 
 		if (accept) 
 			break;
 	}
 
+
 	assert(accept);
 	s->n++;
 	for (y=0; y < s->n; y++) 
 		s->a[y] = a[y];
+
+#if 0
+	fprintf(stderr, "a(+%2d): ", j);
+	for (i=0; i <= s->n; i++) {
+		float dt = s->a[i].s - darp->l[s->a[i].i];
+		fprintf(stderr, "%2d ", s->a[i].i);
+		if (dt > 0)
+			fprintf(stderr, "[%2.1f] ", dt);
+		else
+			fprintf(stderr, " ");
+	}
+	fprintf(stderr, " := %.1f\n", cost);
+#endif
+
+	return cost;
 }
 
 int
@@ -341,17 +382,24 @@ main(void)
 	// read problem
 	darpread(&darp);
 
-
 	// perform main iterations
 	for (loop=0; loop < maxloop; loop++) {
 		// create priority rule
 		darpmkrule(&darp, &rule);
 
+		printf("RULE: ");
+		for (i=0; i < darp.N; i++)
+			printf("%2d ", rule[i].i);
+		puts("");
+
 		// create schedule
-		// TODO: reset schedule
 		darpreset(&darp, &schedule);
-		for (i=1; i < darp.N; i++) 
+		for (i=1; i < darp.N; i++) {
+			if (inD(&darp, rule[i].i))
+				continue;
 			darpinsert(&darp, &schedule, rule[i].i);
+			darpinsert(&darp, &schedule, rule[i].i+darp.n);
+		}
 
 		// examine schedule
 		// TODO

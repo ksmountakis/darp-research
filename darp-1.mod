@@ -15,10 +15,9 @@ param q {i in N} integer;
 param e {i in N} >= 0;
 param l {i in N} >= 0;
 param t {i in N, j in N} >= 0;
-param bigM integer := 1e3*T;
+param bigM integer := 1e6*T;
 
 var x {i in N, j in N, k in K} binary;
-#var s {i in N, k in K} >= 0;
 var s {i in N} >= 0;
 var u {i in N} >= 0;
 
@@ -27,8 +26,10 @@ var f;
 minimize cost: f;
 
 subject to objective:
-	f = sum {i in N, j in N, k in K} t[i,j]*x[i,j,k];
+	#f = sum {i in N, j in N, k in K} t[i,j]*x[i,j,k];
 	#f = 100*((sum {i in P} ((s[i+n] - s[i])/t[i,i+n]))/n - 1.0);
+	f = sum {i in P} s[i];
+
 
 subject to outP{i in P}:
 	sum {j in N, k in K} x[i,j,k] = 1;
@@ -51,13 +52,8 @@ subject to sink {k in K}:
 subject to sink_no_P {k in K}:
 	sum {i in P} x[i,2*n+2,k] = 0;
 
-
 subject to precedence_no_cycles {i in N, j in N}:
 	s[j] >= s[i] + d[i] + t[i,j] - (1 - sum {k in K} x[i,j,k])*bigM;
-#subject to precedence_no_cycles {i in N, j in N, k in K}:
-#	s[j,k] >= s[i,k] + d[i] + t[i,j] - (1 - x[i,j,k])*bigM;
-#
-
 
 subject to resource_use {i in N, j in N}:
 	u[j] >= u[i] + q[i] - (1 - sum {k in K} x[i,j,k])*bigM;
@@ -67,28 +63,21 @@ subject to capacity {i in N}:
 
 subject to earliest_start {i in N}:
 	s[i] >= e[i];
-#subject to earliest_start {i in N, k in K}:
-#	s[i, k] >= e[i];
 
 subject to latest_start {i in N}:
 	s[i] <= l[i];
-#subject to latest_start {i in N, k in K}:
-#	s[i,k] <= l[i];
 
 subject to maxusertime {i in P}:
 	s[i+n] - (s[i] + d[i]) <= L;
-#subject to maxusertime {i in P, k in K}:
-#	s[i+n, k] - (s[i,k] + d[i]) <= L;
 
 subject to minusertime {i in P}:
 	s[i+n] - (s[i] + d[i]) >= t[i,i+n];
-#subject to minusertime {i in P, k in K}:
-#	s[i+n, k] - (s[i, k] + d[i]) >= t[i,i+n];
 
 subject to maxridetime:
 	s[2*n+2] - s[1] <= T;
-#subject to maxridetime {k in K}:
-#	s[2*n+2, k] - s[1, k] <= T;
+
+subject to s0:
+	s[1] = 0;
 
 solve;
 display f, u;

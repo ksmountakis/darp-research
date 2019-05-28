@@ -50,7 +50,6 @@ subject to sink {k in K}:
 subject to sink_no_P {k in K}:
 	sum {i in P} x[i,2*n+2,k] = 0;
 
-
 subject to precedence_no_cycles {i in N, j in N, k in K}:
 	s[j,k] >= s[i,k] + d[i] + t[i,j] - (1 - x[i,j,k])*bigM;
 
@@ -67,7 +66,7 @@ subject to latest_start {i in N, k in K}:
 	s[i,k] <= l[i];
 
 subject to maxusertime {i in P, k in K}:
-	s[i+n, k] - (s[i,k] + d[i]) <= L;
+	s[i+n, k] - (s[i,k] + d[i]) <= 2*L;
 
 subject to minusertime {i in P, k in K}:
 	s[i+n, k] - (s[i, k] + d[i]) >= t[i,i+n];

@@ -1,5 +1,5 @@
 param n := 16;
-param m := 12;
+param m := 2;
 param L := 30;
 param Q := 3;
 param T := 480;
