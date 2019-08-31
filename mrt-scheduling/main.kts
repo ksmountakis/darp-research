@@ -24,7 +24,7 @@ fun main() {
     val upper = listOf<Double>(7.5, 15.0, inf, inf)
     val delta = listOf<Double>(7.5, 10.0, 5.0)
     val isPickup = listOf<Boolean>(true, true, false, false)
-    val DtoP = listOf<Int>(-1, -1, 0, 1)
+    val toPickup = listOf<Int>(-1, -1, 0, 1)
     val theta = (0 .. N-1).map {mutableSetOf<ThetaEntry>()}
     val mrt: Map<Pair<Int, Int>, Double> = mapOf(
             Pair(0, 2) to 18.0,
@@ -37,7 +37,7 @@ fun main() {
     val upper = listOf<Double>(inf, inf, inf, inf, inf, inf)
     val delta = listOf<Double>(10.0, 5.0, 5.0, 5.0, 5.0)
     val isPickup = listOf<Boolean>(true, true, false, true, false, false)
-    val DtoP = listOf<Int>(-1, -1, 0, -1, 1, 3)
+    val toPickup = listOf<Int>(-1, -1, 0, -1, 1, 3)
     val theta = (0 .. N-1).map {mutableSetOf<ThetaEntry>()}
     val mrt: Map<Pair<Int, Int>, Double> = mapOf(
             Pair(0, 2) to 15.0,
@@ -71,7 +71,7 @@ fun main() {
             theta[i] += mutableSetOf(ThetaEntry(i, 0.0))
             p.add(i)
         } else
-            theta[i].remove(theta[i].first{it.node == DtoP[i]})
+            theta[i].remove(theta[i].first{it.node == toPickup[i]})
     }
 
     // forward pass: fwdArc[]
@@ -84,10 +84,10 @@ fun main() {
             lastPDelta = 0.0
         } else if (lastP != -1) {
             lastPDelta += delta[i-1]
-            if (lastP != DtoP[i]) {
-                mrt[Pair(DtoP[i], i)]?.let {
-                    fwdArc[DtoP[i]] = FwdArc(lastP, it - lastPDelta)
-                } ?: error("no mrt defined for pair (P=${DtoP[i]}, D=$i)")
+            if (lastP != toPickup[i]) {
+                mrt[Pair(toPickup[i], i)]?.let {
+                    fwdArc[toPickup[i]] = FwdArc(lastP, it - lastPDelta)
+                } ?: error("no mrt defined for pair (P=${toPickup[i]}, D=$i)")
             }
         }
     }
@@ -126,7 +126,7 @@ fun main() {
     for (i in 0 .. N-1) {
         print("t[$i] = ${t[i]}")
         if (!isPickup[i])
-            print("\tRT = ${t[i]-t[DtoP[i]]} MRT = ${mrt[Pair(DtoP[i], i)]}")
+            print("\tRT = ${t[i]-t[toPickup[i]]} MRT = ${mrt[Pair(toPickup[i], i)]}")
         println("")
     }
 
